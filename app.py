@@ -18,6 +18,11 @@ def parse_time(time_str):
     hours, minutes, seconds, milliseconds = map(int, re.split('[:,]', time_str))
     return ((hours * 60 + minutes) * 60 + seconds) * 1000 + milliseconds
 
+def parse_time(time_str):
+    """解析时间字符串为毫秒"""
+    hours, minutes, seconds, milliseconds = map(int, re.split('[:,]', time_str))
+    return ((hours * 60 + minutes) * 60 + seconds) * 1000 + milliseconds
+
 def read_and_process_srt(file_path, max_length=200, comma_threshold=1000, period_threshold=3000):
     with open(file_path, 'r', encoding='utf-8') as file:
         lines = file.readlines()
@@ -33,31 +38,40 @@ def read_and_process_srt(file_path, max_length=200, comma_threshold=1000, period
             time_diff = start_time - prev_end_time
 
             if current_segment and time_diff < comma_threshold and len(current_segment) + len(line.strip()) <= max_length:
-                current_segment += ','
+                current_segment = current_segment.rstrip(',') + ','  # 确保末尾只有一个逗号
             else:
                 if current_segment:
                     # 确保每个段落以句号结束
                     if not current_segment.endswith('。'):
-                        current_segment += '。'
+                        current_segment = current_segment.rstrip(',') + '。'
                     output.append(current_segment)
                     current_segment = ""
 
             prev_end_time = end_time
 
         elif line.strip() and not line.strip().isdigit():
-            if len(current_segment) + len(line.strip()) > max_length:
-                # 确保每个段落以句号结束
-                if not current_segment.endswith('。'):
-                    current_segment += '。'
-                output.append(current_segment)
-                current_segment = line.strip()
-            else:
-                current_segment += line.strip()
+            text_line = line.strip()
 
-    # 添加最后一个段落
+            # 移除 < No Speech > 标签
+            text_line = text_line.replace('< No Speech >', '').strip()
+
+            # 移除文本行开头的逗号
+            text_line = text_line.lstrip(',')
+
+            # 检查长度并添加到当前段落
+            if len(current_segment) + len(text_line) > max_length:
+                # 确保段落以句号结束
+                if not current_segment.endswith('。'):
+                    current_segment = current_segment.rstrip(',') + '。'
+                output.append(current_segment)
+                current_segment = text_line
+            else:
+                current_segment += text_line
+
+    # 处理最后一个段落
     if current_segment:
         if not current_segment.endswith('。'):
-            current_segment += '。'
+            current_segment = current_segment.rstrip(',') + '。'
         output.append(current_segment)
 
     return '\n\n'.join(output)
